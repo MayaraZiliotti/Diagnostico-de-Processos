@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Attractfy — Diagnóstico de Processos</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --lilac:#A78BFA;--lilac-light:#F5F3FF;--lilac-mid:#DDD6FE;
+  --ok-f:#D1FAE5;--ok-s:#059669;--ok-t:#065F46;
+  --warn-f:#FEF3C7;--warn-s:#D97706;--warn-t:#92400E;
+  --crit-f:#FFE4E6;--crit-s:#E11D48;--crit-t:#881337;
+  --none-f:#F8F7FF;--none-s:#A78BFA;--none-t:#5B21B6;
+  --bg:#FDF4FF;--surface:#fff;
+  --border:rgba(167,139,250,0.15);--border-s:rgba(167,139,250,0.35);
+  --text:#1E1B4B;--muted:#7C3AED;--light:#C4B5FD;
+}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;
+  background-image:radial-gradient(circle at 15% 50%,rgba(244,114,182,0.07) 0%,transparent 50%),
+                   radial-gradient(circle at 85% 50%,rgba(96,165,250,0.07) 0%,transparent 50%);}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#FDF2F8,#F5F3FF,#EFF6FF);border-bottom:1px solid var(--border-s);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(167,139,250,0.1);}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#F472B6,#A78BFA,#60A5FA);display:flex;align-items:center;justify-content:center;font-size:15px;}
+.logo-name{font-size:14px;font-weight:700;background:linear-gradient(135deg,#EC4899,#7C3AED,#2563EB);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.logo-sub{font-size:10px;color:var(--light);font-weight:500;}
+.hactions{display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+.btn{display:inline-flex;align-items:center;gap:5px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:600;padding:6px 13px;border-radius:20px;border:1.5px solid var(--border-s);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.18s;}
+.btn:hover{background:var(--lilac-light);border-color:var(--lilac);transform:translateY(-1px);}
+.btn-primary{background:linear-gradient(135deg,#F472B6,#A78BFA);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(167,139,250,0.3);}
+.btn-primary:hover{background:linear-gradient(135deg,#EC4899,#7C3AED);}
+.btn-danger{color:#E11D48;border-color:#FECDD3;}
+.btn-danger:hover{background:#FFE4E6;}
+
+/* TOOLBAR */
+.toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:9px 20px;display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+.toolbar input,.toolbar select{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:7px 13px;border:1.5px solid var(--border-s);border-radius:20px;background:var(--lilac-light);color:var(--text);outline:none;transition:all 0.18s;}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--lilac);background:var(--surface);}
+.toolbar input::placeholder{color:var(--light);}
+#inp-label{flex:1;min-width:150px;}
+#inp-meta,#inp-real{width:75px;}
+
+main{padding:16px 20px;}
+#status{font-size:12px;font-weight:500;color:var(--muted);background:var(--lilac-light);border:1px solid var(--lilac-mid);border-radius:10px;padding:9px 14px;margin-bottom:14px;min-height:36px;display:flex;align-items:center;gap:7px;}
+#status.alert{background:#FFE4E6;border-color:#FECDD3;color:#E11D48;}
+#status.ok{background:#D1FAE5;border-color:#A7F3D0;color:#065F46;}
+
+/* TREE CONTAINER — scroll horizontal */
+.tree-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 2px 12px rgba(167,139,250,0.1);overflow:auto;padding:32px 40px;}
+
+/* HORIZONTAL TREE */
+/* Each node-row = node card + horizontal connector + children column */
+.h-tree{display:flex;flex-direction:row;align-items:center;}
+
+/* The column of siblings */
+.h-siblings{display:flex;flex-direction:column;gap:0;}
+
+/* One sibling row: vertical line piece + node-row */
+.h-sibling{display:flex;flex-direction:row;align-items:center;}
+
+/* Vertical bar connecting siblings */
+.v-bar-wrap{display:flex;flex-direction:column;align-items:center;align-self:stretch;}
+.v-bar-top{flex:1;width:2px;background:linear-gradient(to bottom,transparent,#C4B5FD);}
+.v-bar-bot{flex:1;width:2px;background:linear-gradient(to bottom,#C4B5FD,transparent);}
+.v-bar-mid{width:2px;height:100%;background:#C4B5FD;}
+.v-bar-single{width:2px;flex:1;background:transparent;}
+
+/* Horizontal connector from parent to child */
+.h-connector{height:2px;min-width:28px;background:linear-gradient(to right,#C4B5FD,#93C5FD);border-radius:1px;flex-shrink:0;}
+.h-connector-stub{height:2px;min-width:14px;background:#C4B5FD;border-radius:1px;flex-shrink:0;}
+
+/* NODE CARD */
+.node-card{
+  position:relative;
+  min-width:140px;max-width:168px;
+  background:var(--none-f);border:1.5px solid var(--none-s);
+  border-radius:13px;padding:10px 12px 8px;
+  cursor:pointer;transition:all 0.18s;
+  box-shadow:0 2px 8px rgba(167,139,250,0.08);
+  flex-shrink:0;
+  margin:5px 0;
+}
+.node-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(167,139,250,0.2);}
+.node-card.ok{background:var(--ok-f);border-color:var(--ok-s);}
+.node-card.warn{background:var(--warn-f);border-color:var(--warn-s);}
+.node-card.crit{background:var(--crit-f);border-color:var(--crit-s);}
+.node-card.root-node{background:linear-gradient(135deg,#FDF2F8,#F5F3FF,#EFF6FF);border-color:var(--lilac);}
+
+.node-accent{position:absolute;top:0;left:8px;right:8px;height:3px;border-radius:0 0 3px 3px;opacity:0.35;background:var(--lilac);}
+.node-card.ok .node-accent{background:var(--ok-s);}
+.node-card.warn .node-accent{background:var(--warn-s);}
+.node-card.crit .node-accent{background:var(--crit-s);}
+
+.node-top{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
+.node-icon{font-size:12px;flex-shrink:0;}
+.node-label{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.node-card.ok .node-label{color:var(--ok-t);}
+.node-card.warn .node-label{color:var(--warn-t);}
+.node-card.crit .node-label{color:var(--crit-t);}
+
+.node-meta{font-size:10px;font-weight:500;color:var(--none-s);margin-bottom:4px;}
+.node-card.ok .node-meta{color:var(--ok-s);}
+.node-card.warn .node-meta{color:var(--warn-s);}
+.node-card.crit .node-meta{color:var(--crit-s);}
+.node-hint{font-size:9px;color:var(--light);margin-bottom:3px;}
+
+.pct-badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:9px;margin-bottom:4px;background:var(--lilac-mid);color:var(--muted);}
+.node-card.ok .pct-badge{background:#A7F3D0;color:var(--ok-t);}
+.node-card.warn .pct-badge{background:#FDE68A;color:var(--warn-t);}
+.node-card.crit .pct-badge{background:#FECDD3;color:var(--crit-t);}
+
+.prog-bar{height:3px;border-radius:2px;background:rgba(167,139,250,0.15);overflow:hidden;margin-top:2px;}
+.prog-fill{height:100%;border-radius:2px;}
+.node-card.ok .prog-fill{background:var(--ok-s);}
+.node-card.warn .prog-fill{background:var(--warn-s);}
+.node-card.crit .prog-fill{background:var(--crit-s);}
+.node-card .prog-fill{background:var(--lilac);}
+
+/* DEL BUTTON on hover */
+.node-del{display:none;position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:5px;border:none;cursor:pointer;font-size:9px;background:#FECDD3;color:#E11D48;align-items:center;justify-content:center;transition:all 0.15s;}
+.node-del:hover{background:#E11D48;color:#fff;}
+.node-card:hover .node-del{display:flex;}
+
+/* COLLAPSE BUTTON */
+.col-btn{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-s);background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);transition:all 0.18s;box-shadow:0 1px 4px rgba(167,139,250,0.15);flex-shrink:0;margin:0 4px;}
+.col-btn:hover{background:var(--lilac-light);border-color:var(--lilac);}
+
+/* GARGALO */
+#gargalo-panel{display:none;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px;}
+#gargalo-panel h4{font-size:13px;font-weight:700;margin-bottom:10px;background:linear-gradient(135deg,#EC4899,#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.gi{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.gi:last-child{border-bottom:none;}
+.gbadge{font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;min-width:44px;text-align:center;}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(91,33,182,0.18);backdrop-filter:blur(5px);z-index:300;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:18px;padding:24px;width:90%;max-width:360px;box-shadow:0 20px 60px rgba(124,58,237,0.18);border:1px solid var(--lilac-mid);animation:su 0.2s ease;}
+@keyframes su{from{transform:translateY(18px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;background:linear-gradient(135deg,#EC4899,#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.modal label{font-size:11px;color:var(--muted);display:block;margin-top:10px;margin-bottom:3px;font-weight:600;}
+.modal input,.modal select{width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:8px 12px;border:1.5px solid var(--lilac-mid);border-radius:10px;background:var(--lilac-light);color:var(--text);outline:none;}
+.modal input:focus,.modal select:focus{border-color:var(--lilac);}
+.modal-btns{display:flex;gap:7px;margin-top:18px;}
+.modal-btns button{flex:1;}
+.modal-note{font-size:10.5px;color:var(--muted);margin-top:10px;background:var(--lilac-light);padding:9px 11px;border-radius:9px;line-height:1.6;border-left:3px solid var(--lilac);}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:11px;font-weight:500;color:var(--muted);align-items:center;}
+.legend-item{display:flex;align-items:center;gap:4px;}
+.dot{width:7px;height:7px;border-radius:50%;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌸</div>
+    <div><div class="logo-name">Attractfy Consultoria</div><div class="logo-sub">Diagnóstico de Processos</div></div>
+  </div>
+  <div class="hactions">
+    <button class="btn" onclick="exportData()">⬇ Exportar</button>
+    <button class="btn" onclick="document.getElementById('file-import').click()">⬆ Importar</button>
+    <input type="file" id="file-import" accept=".json" style="display:none" onchange="importData(event)"/>
+    <button class="btn btn-danger" onclick="resetTree()">↺ Resetar</button>
+    <button class="btn btn-primary" onclick="analyzeGargalos()">✦ Analisar gargalos</button>
+  </div>
+</header>
+<div class="toolbar">
+  <input id="inp-label" placeholder="Nome da etapa"/>
+  <input id="inp-meta" type="number" placeholder="Meta"/>
+  <input id="inp-real" type="number" placeholder="Real"/>
+  <select id="inp-parent"></select>
+  <button class="btn btn-primary" onclick="addNode()">+ Adicionar</button>
+</div>
+<main>
+  <div id="status">✦ Clique em qualquer nó para editar. Use ◀/▶ para minimizar ramos.</div>
+  <div id="gargalo-panel"><h4>✦ Análise de Gargalos</h4><div id="gargalo-list"></div></div>
+  <div class="tree-wrap" id="tree-wrap"></div>
+  <div class="legend">
+    <span style="font-weight:700;color:var(--text)">Legenda:</span>
+    <div class="legend-item"><div class="dot" style="background:#059669"></div> ≥90%</div>
+    <div class="legend-item"><div class="dot" style="background:#D97706"></div> 60–89%</div>
+    <div class="legend-item"><div class="dot" style="background:#E11D48"></div> &lt;60%</div>
+    <div class="legend-item"><div class="dot" style="background:#A78BFA"></div> Sem dados</div>
+    <div class="legend-item" style="margin-left:auto;font-size:10px;color:var(--light)">◀ minimiza · ▶ expande</div>
+  </div>
+</main>
+
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <h3 id="modal-title">Editar etapa</h3>
+    <label>Nome</label><input id="ed-name" type="text"/>
+    <label>Meta</label><input id="ed-meta" type="number" placeholder="ex: 50"/>
+    <label>Real</label><input id="ed-real" type="number" placeholder="ex: 32"/>
+    <label>Taxa de conversão (%)</label><input id="ed-conv" type="number" min="0" max="100"/>
+    <label>Nó pai</label><select id="ed-parent"></select>
+    <div class="modal-note">💜 Taxa de conversão aparece na conexão de entrada desta etapa.</div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" onclick="deleteNode()">🗑 Excluir</button>
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function buildDefault() {
+  const ns = [{ id:1, label:'Faturamento', meta:null, real:null, conv:null, parent:null, isRoot:true, collapsed:false }];
+  const vertentes = [
+    {name:'FY',id:2},{name:'POP',id:3},{name:'COMM',id:4},{name:'SALES',id:5},{name:'CANCELAMENTOS',id:6}
+  ];
+  vertentes.forEach(v => {
+    ns.push({id:v.id, label:v.name, meta:null, real:null, conv:null, parent:1, collapsed:false});
+    if (v.name==='CANCELAMENTOS') return;
+    const ab=v.id*100+10, fe=v.id*100+50;
+    ns.push({id:ab,   label:'Abertura',             meta:null,real:null,conv:null,parent:v.id,collapsed:false});
+    ns.push({id:fe,   label:'Fechamento',            meta:null,real:null,conv:null,parent:v.id,collapsed:false});
+    ns.push({id:ab+1, label:'Leads gerados',         meta:null,real:null,conv:null,parent:ab,collapsed:false});
+    ns.push({id:ab+2, label:'Reuniões agendadas',    meta:null,real:null,conv:null,parent:ab+1,collapsed:false});
+    ns.push({id:ab+3, label:'Propostas enviadas',    meta:null,real:null,conv:null,parent:ab+2,collapsed:false});
+    ns.push({id:ab+4, label:'Contratos assinados',   meta:null,real:null,conv:null,parent:ab+3,collapsed:false});
+    ns.push({id:fe+1, label:'Candidatos enviados',   meta:null,real:null,conv:null,parent:fe,collapsed:false});
+    ns.push({id:fe+2, label:'Candidatos entregues',  meta:null,real:null,conv:null,parent:fe+1,collapsed:false});
+    ns.push({id:fe+3, label:'Candidatos aprovados',  meta:null,real:null,conv:null,parent:fe+2,collapsed:false});
+    ns.push({id:fe+4, label:'Triagem de candidatos', meta:null,real:null,conv:null,parent:fe+3,collapsed:false});
+  });
+  return ns;
+}
+
+let nodes = buildDefault();
+let nextId = 900;
+let editingId = null;
+
+function persist(){try{localStorage.setItem('atfy_h1',JSON.stringify(nodes));localStorage.setItem('atfy_h1_nid',nextId);}catch(e){}}
+function loadData(){try{const d=localStorage.getItem('atfy_h1');const n=localStorage.getItem('atfy_h1_nid');if(d){nodes=JSON.parse(d);nextId=n?parseInt(n):900;}}catch(e){}}
+
+function getIcon(l){
+  l=l.toLowerCase();
+  if(l.includes('fatur'))return'💰';
+  if(l==='fy'||l==='pop'||l==='comm'||l==='sales')return'📊';
+  if(l.includes('cancel'))return'❌';
+  if(l.includes('abertura'))return'🔓';
+  if(l.includes('fechamento'))return'🔒';
+  if(l.includes('lead'))return'🎯';
+  if(l.includes('reuni'))return'📅';
+  if(l.includes('proposta'))return'📄';
+  if(l.includes('contrato'))return'✍️';
+  if(l.includes('candidato')&&l.includes('envi'))return'📨';
+  if(l.includes('candidato')&&l.includes('entre'))return'👥';
+  if(l.includes('candidato')&&l.includes('aprov'))return'✅';
+  if(l.includes('triagem'))return'🔍';
+  return'◆';
+}
+
+function getStatus(n){
+  if(n.isRoot)return'root';
+  if(n.meta==null||n.real==null)return'none';
+  const p=n.real/n.meta*100;
+  if(p>=90)return'ok';if(p>=60)return'warn';return'crit';
+}
+
+function getChildren(id){return nodes.filter(n=>n.parent===id);}
+
+// Render a node and its subtree horizontally
+function renderNode(n){
+  const st=getStatus(n);
+  const pct=(n.meta&&n.real)?Math.round(n.real/n.meta*100):null;
+  const children=getChildren(n.id);
+  const hasChildren=children.length>0;
+  const collapsed=n.collapsed;
+
+  let cardClass='node-card'+(n.isRoot?' root-node':st==='ok'?' ok':st==='warn'?' warn':st==='crit'?' crit':'');
+  const metaLine=(n.meta!=null&&n.real!=null)?`${n.real} / ${n.meta}`:'';
+  const pctBadge=pct!=null?`<div class="pct-badge">${pct}%</div>`:'';
+  const progBar=pct!=null?`<div class="prog-bar"><div class="prog-fill" style="width:${Math.min(pct,100)}%"></div></div>`:'';
+  const convLabel=n.conv!=null?`<div style="font-size:9px;color:var(--light);margin-bottom:2px;">conv: ${n.conv}%</div>`:'';
+
+  // Collapse button (shown to right of card)
+  const colBtn=hasChildren
+    ?`<button class="col-btn" onclick="toggleCollapse(${n.id},event)" title="${collapsed?'Expandir':'Minimizar'}">${collapsed?'▶':'◀'}</button>`
+    :'';
+
+  // Children subtree
+  let childrenHTML='';
+  if(hasChildren&&!collapsed){
+    // Each child gets: vertical bar section + horizontal connector + node
+    const childNodes=children.map((c,i)=>{
+      const isFirst=i===0, isLast=i===children.length-1, isOnly=children.length===1;
+      const vTop=isOnly?'transparent':isFirst?'transparent':'#C4B5FD';
+      const vBot=isOnly?'transparent':isLast?'transparent':'#C4B5FD';
+      return `
+        <div style="display:flex;flex-direction:row;align-items:center;">
+          <div style="display:flex;flex-direction:column;align-items:center;align-self:stretch;width:2px;">
+            <div style="flex:1;width:2px;background:${vTop};"></div>
+            <div style="width:2px;height:2px;background:#C4B5FD;"></div>
+            <div style="flex:1;width:2px;background:${vBot};"></div>
+          </div>
+          <div class="h-connector-stub"></div>
+          ${renderNode(c)}
+        </div>`;
+    }).join('');
+
+    childrenHTML=`
+      <div class="h-connector"></div>
+      <div style="display:flex;flex-direction:column;justify-content:center;">
+        ${childNodes}
+      </div>`;
+  }
+
+  return `
+    <div style="display:flex;flex-direction:row;align-items:center;">
+      <div class="${cardClass}" onclick="openEdit(${n.id})">
+        <div class="node-accent"></div>
+        <button class="node-del" onclick="quickDelete(${n.id},event)">✕</button>
+        <div class="node-top">
+          <span class="node-icon">${getIcon(n.label)}</span>
+          <span class="node-label">${n.label}</span>
+        </div>
+        ${metaLine?`<div class="node-meta">${metaLine}</div>`:`<div class="node-hint">+ adicionar dados</div>`}
+        ${pctBadge}${convLabel}${progBar}
+      </div>
+      ${colBtn}
+      ${childrenHTML}
+    </div>`;
+}
+
+function renderTree(){
+  const wrap=document.getElementById('tree-wrap');
+  const root=nodes.find(n=>n.isRoot);
+  if(!root){wrap.innerHTML='<p style="color:var(--light);padding:20px;">Nenhum nó raiz.</p>';return;}
+  wrap.innerHTML=renderNode(root);
+  // update parent selects
+  const opts=nodes.map(n=>`<option value="${n.id}">${n.label}</option>`).join('');
+  document.getElementById('inp-parent').innerHTML=opts;
+}
+
+function toggleCollapse(id,e){
+  e.stopPropagation();
+  const n=nodes.find(x=>x.id===id);
+  if(n){n.collapsed=!n.collapsed;persist();renderTree();}
+}
+
+function openEdit(id){
+  editingId=id;
+  const n=nodes.find(x=>x.id===id);
+  document.getElementById('modal-title').textContent='Editar: '+n.label;
+  document.getElementById('ed-name').value=n.label;
+  document.getElementById('ed-meta').value=n.meta??'';
+  document.getElementById('ed-real').value=n.real??'';
+  document.getElementById('ed-conv').value=n.conv??'';
+  const sel=document.getElementById('ed-parent');
+  sel.innerHTML='<option value="">— sem pai —</option>';
+  nodes.filter(x=>x.id!==id).forEach(x=>{sel.innerHTML+=`<option value="${x.id}" ${x.id===n.parent?'selected':''}>${x.label}</option>`;});
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open');editingId=null;}
+function overlayClick(e){if(e.target.id==='overlay')closeModal();}
+function saveEdit(){
+  if(!editingId)return;
+  const n=nodes.find(x=>x.id===editingId);
+  n.label=document.getElementById('ed-name').value.trim()||n.label;
+  n.meta=parseFloat(document.getElementById('ed-meta').value)||null;
+  n.real=parseFloat(document.getElementById('ed-real').value)||null;
+  n.conv=parseFloat(document.getElementById('ed-conv').value)||null;
+  const pv=document.getElementById('ed-parent').value;
+  n.parent=pv?parseInt(pv):null;n.isRoot=!pv;
+  closeModal();persist();renderTree();setStatus('✅ Atualizado!','ok');
+}
+function deleteNode(){
+  if(!editingId)return;
+  const n=nodes.find(x=>x.id===editingId);
+  if(n.isRoot){setStatus('⚠️ Não é possível excluir o nó raiz.','alert');closeModal();return;}
+  if(!confirm(`Excluir "${n.label}" e todos os seus filhos?`))return;
+  deleteRecursive(editingId);closeModal();persist();renderTree();setStatus('🗑 Removido.','');
+}
+function quickDelete(id,e){
+  e.stopPropagation();
+  const n=nodes.find(x=>x.id===id);
+  if(n.isRoot){setStatus('⚠️ Não é possível excluir o nó raiz.','alert');return;}
+  if(!confirm(`Excluir "${n.label}" e todos os seus filhos?`))return;
+  deleteRecursive(id);persist();renderTree();setStatus('🗑 Removido.','');
+}
+function deleteRecursive(id){
+  getChildren(id).forEach(c=>deleteRecursive(c.id));
+  nodes=nodes.filter(x=>x.id!==id);
+}
+function addNode(){
+  const label=document.getElementById('inp-label').value.trim();
+  if(!label){setStatus('⚠️ Digite o nome da etapa.','alert');return;}
+  const meta=parseFloat(document.getElementById('inp-meta').value)||null;
+  const real=parseFloat(document.getElementById('inp-real').value)||null;
+  const parentId=parseInt(document.getElementById('inp-parent').value)||1;
+  nodes.push({id:nextId++,label,meta,real,conv:null,parent:parentId,isRoot:false,collapsed:false});
+  document.getElementById('inp-label').value='';
+  document.getElementById('inp-meta').value='';
+  document.getElementById('inp-real').value='';
+  persist();renderTree();setStatus(`✅ "${label}" adicionada!`,'ok');
+}
+function analyzeGargalos(){
+  const issues=nodes.filter(n=>!n.isRoot&&n.meta!=null&&n.real!=null).map(n=>({label:n.label,pct:Math.round(n.real/n.meta*100),real:n.real,meta:n.meta})).sort((a,b)=>a.pct-b.pct);
+  if(!issues.length){setStatus('⚠️ Adicione metas e resultados para analisar.','alert');return;}
+  document.getElementById('gargalo-panel').style.display='block';
+  document.getElementById('gargalo-list').innerHTML=issues.map(i=>{
+    const col=i.pct>=90?'#059669':i.pct>=60?'#D97706':'#E11D48';
+    const bg=i.pct>=90?'#D1FAE5':i.pct>=60?'#FEF3C7':'#FFE4E6';
+    const icon=i.pct>=90?'✅':i.pct>=60?'⚠️':'🚨';
+    return `<div class="gi"><span style="font-size:14px">${icon}</span><span style="flex:1;font-weight:600">${i.label}</span><span style="color:var(--muted);font-size:11px">${i.real}/${i.meta}</span><span class="gbadge" style="background:${bg};color:${col}">${i.pct}%</span></div>`;
+  }).join('');
+  const worst=issues.filter(i=>i.pct<60);
+  if(worst.length)setStatus(`🚨 Crítico: ${worst.map(i=>i.label).join(', ')}`,'alert');
+  else setStatus('✅ Nenhuma etapa crítica!','ok');
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify({nodes,nextId,empresa:'Attractfy',exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`attractfy-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  setStatus('⬇ Exportado!','ok');
+}
+function importData(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{try{const d=JSON.parse(e.target.result);nodes=d.nodes;nextId=d.nextId||900;persist();renderTree();setStatus(`✅ ${nodes.length} etapas carregadas.`,'ok');}catch(err){setStatus('⚠️ Arquivo inválido.','alert');}};
+  reader.readAsText(file);event.target.value='';
+}
+function resetTree(){
+  if(!confirm('Resetar para a estrutura padrão?'))return;
+  nodes=buildDefault();nextId=900;persist();renderTree();
+  document.getElementById('gargalo-panel').style.display='none';
+  setStatus('↺ Resetado.','');
+}
+function setStatus(msg,type){const el=document.getElementById('status');el.textContent=msg;el.className=type||'';}
+loadData();renderTree();
+</script>
+</body>
+</html>
